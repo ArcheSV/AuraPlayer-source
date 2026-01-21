@@ -38,20 +38,30 @@ export function PlayerControls() {
   const [progress, setProgress] = useState<ProgressState>({ played: 0, playedSeconds: 0, loaded: 0, loadedSeconds: 0 });
   const [duration, setDuration] = useState(0);
   const [playerError, setPlayerError] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
 
   useEffect(() => {
     setProgress({ played: 0, playedSeconds: 0, loaded: 0, loadedSeconds: 0 });
   }, [currentSong]);
 
-  
+
   useEffect(() => {
     if (!window.electronAPI) return;
 
     const handleProgress = (_event: any, message: string) => {
       console.log('[Download Progress]', message);
+      if (message.includes('%')) {
+        const percent = parseFloat(message.replace('%', ''));
+        if (!isNaN(percent)) {
+          setDownloadProgress(percent);
+        }
+      }
     };
 
     const handleComplete = (_event: any, success: boolean) => {
+      setIsDownloading(false);
+      setDownloadProgress(0);
       if (success) {
         toast.success('¡Descarga completada! El archivo se guardó correctamente.', {
           duration: 4000,
@@ -112,14 +122,17 @@ export function PlayerControls() {
   const handleDownload = () => {
     if (!currentSong) return;
 
-    
+
     if (window.electronAPI) {
+      if (isDownloading) return;
+      setIsDownloading(true);
+      setDownloadProgress(0);
       toast('Iniciando descarga...', { icon: '🖥️' });
       window.electronAPI.downloadSong(currentSong.id, currentSong.title);
       return;
     }
 
-    
+
     const API_URL = (import.meta.env.VITE_API_URL as string | undefined) || '';
     const downloadUrl = `${API_URL}/api/download?id=${currentSong.id}`;
     window.open(downloadUrl, '_blank');
@@ -243,9 +256,24 @@ export function PlayerControls() {
         </div>
 
         <div className="hidden md:flex items-center gap-2 w-64 justify-end">
-          <button onClick={handleDownload} className="text-zinc-400 hover:text-white mr-2" title="Descargar MP3">
-            <Download size={20} />
-          </button>
+          {isDownloading ? (
+            <div className="flex flex-col w-24 mr-2">
+              <div className="flex justify-between text-[10px] text-zinc-400 mb-1">
+                <span>Descargando</span>
+                <span>{Math.round(downloadProgress)}%</span>
+              </div>
+              <div className="bg-zinc-700 h-1 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-green-500 transition-all duration-300 ease-out"
+                  style={{ width: `${downloadProgress}%` }}
+                />
+              </div>
+            </div>
+          ) : (
+            <button onClick={handleDownload} className="text-zinc-400 hover:text-white mr-2" title="Descargar MP3">
+              <Download size={20} />
+            </button>
+          )}
           {playerState.volume > 0.5 && <Volume2 size={20} />}
           {playerState.volume > 0 && playerState.volume <= 0.5 && <Volume1 size={20} />}
           {playerState.volume === 0 && <VolumeX size={20} />}
