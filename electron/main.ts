@@ -6,16 +6,23 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import http from 'http';
 import https from 'https';
+import handler from 'serve-handler';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const DIST_PATH = path.join(__dirname, '../dist');
-const PUBLIC_PATH = app.isPackaged ? DIST_PATH : path.join(__dirname, '../public');
+const PUBLIC_PATH = app.isPackaged ? process.resourcesPath : path.join(__dirname, '../public');
 
-let win: BrowserWindow | null;
-let splashWin: BrowserWindow | null;
+
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+app.commandLine.appendSwitch('disable-features', 'MediaSessionService');
+app.commandLine.appendSwitch('enable-features', 'WebRtcHideLocalIpsWithMdns');
+
+let win: BrowserWindow | null = null;
+let splashWin: BrowserWindow | null = null;
 
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 
@@ -85,6 +92,8 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
             contextIsolation: true,
+            webviewTag: true,
+            webSecurity: VITE_DEV_SERVER_URL ? true : false,
         },
         title: 'Aura Player',
         icon: path.join(PUBLIC_PATH, 'favicon.ico'),
@@ -93,12 +102,30 @@ function createWindow() {
         backgroundColor: '#18181b',
     });
 
+    win.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+        if (permission === 'media') {
+            callback(true);
+        } else {
+            callback(true);
+        }
+    });
+
     if (VITE_DEV_SERVER_URL) {
         win.loadURL(VITE_DEV_SERVER_URL);
     } else {
-        win.loadFile(path.join(DIST_PATH, 'index.html')).catch(err => {
-            console.error('Failed to load index.html:', err);
-            dialog.showErrorBox('Error loading app', `Failed to load index.html:\n${err.message}\nPath: ${path.join(DIST_PATH, 'index.html')}`);
+        const server = http.createServer((request, response) => {
+            return handler(request, response as any, {
+                public: DIST_PATH,
+                rewrites: [
+                    { source: '**', destination: '/index.html' }
+                ]
+            });
+        });
+
+        const PORT = 45678;
+        server.listen(PORT, () => {
+            console.log(`[Main] Server running at http://localhost:${PORT}`);
+            win?.loadURL(`http://localhost:${PORT}`);
         });
     }
 
