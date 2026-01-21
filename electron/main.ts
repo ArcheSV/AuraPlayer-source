@@ -1,6 +1,4 @@
 
-
-
 import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import path from 'path';
@@ -16,13 +14,72 @@ const DIST_PATH = path.join(__dirname, '../dist');
 const PUBLIC_PATH = app.isPackaged ? DIST_PATH : path.join(__dirname, '../public');
 
 let win: BrowserWindow | null;
+let splashWin: BrowserWindow | null;
 
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
+
+function createSplashWindow() {
+    splashWin = new BrowserWindow({
+        width: 400,
+        height: 300,
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        resizable: false,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+        },
+    });
+
+    splashWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body {
+                    width: 100vw;
+                    height: 100vh;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    background: linear-gradient(135deg, #10b981 0%, #000000 100%);
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                    color: white;
+                    border-radius: 12px;
+                    overflow: hidden;
+                }
+                h1 { font-size: 24px; margin-bottom: 20px; font-weight: 600; }
+                .spinner {
+                    width: 50px;
+                    height: 50px;
+                    border: 4px solid rgba(255,255,255,0.3);
+                    border-top-color: white;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                }
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+                p { margin-top: 20px; font-size: 14px; opacity: 0.9; }
+            </style>
+        </head>
+        <body>
+            <h1>AuraPlayer</h1>
+            <div class="spinner"></div>
+            <p>Comprobando actualizaciones...</p>
+        </body>
+        </html>
+    `)}`);
+}
 
 function createWindow() {
     win = new BrowserWindow({
         width: 1200,
         height: 800,
+        show: false,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             nodeIntegration: false,
@@ -38,15 +95,23 @@ function createWindow() {
     if (VITE_DEV_SERVER_URL) {
         win.loadURL(VITE_DEV_SERVER_URL);
     } else {
-
-        win.loadFile(path.join(DIST_PATH, 'index.html'));
+        win.loadFile(path.join(DIST_PATH, 'index.html')).catch(err => {
+            console.error('Failed to load index.html:', err);
+            dialog.showErrorBox('Error loading app', `Failed to load index.html:\n${err.message}\nPath: ${path.join(DIST_PATH, 'index.html')}`);
+        });
     }
-
-    win.webContents.openDevTools();
 
     win.webContents.setWindowOpenHandler(({ url }) => {
         if (url.startsWith('https:')) shell.openExternal(url);
         return { action: 'deny' };
+    });
+
+    win.once('ready-to-show', () => {
+        if (splashWin) {
+            splashWin.close();
+            splashWin = null;
+        }
+        win?.show();
     });
 }
 
@@ -56,8 +121,14 @@ app.on('window-all-closed', () => {
 });
 
 app.whenReady().then(() => {
+    createSplashWindow();
     createWindow();
 
+    app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+            createWindow();
+        }
+    });
 
     ipcMain.handle('search-song', async (event, query) => {
         try {

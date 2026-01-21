@@ -56,8 +56,10 @@
     "win": {
       "target": "nsis"
     },
-    "directories": {
-      "output": "dist_v2"
-    }
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ]
   }
 }

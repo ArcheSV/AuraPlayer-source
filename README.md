@@ -155,10 +155,18 @@ The desktop application includes automatic updates:
 - Playlists stored per-user in Firestore
 - Cross-device sync across all installations
 
+## TODO
+
+- [ ] Fix MP3 download
+- [ ] Reduce GPU consumption
+- [ ] Design logo
+- [ ] Fix song playback
+
 ## Known Issues
 
-- Notification system in progress
-- User following feature incomplete
+- High GPU consumption
+- Songs not playing
+- Songs not downloading
 
 ## Security Notes
 
