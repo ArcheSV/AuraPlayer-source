@@ -6,6 +6,7 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import https from 'https';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -164,6 +165,91 @@ app.whenReady().then(() => {
             return;
         }
 
+        let ytDlpPath = '';
+        const userDataBin = path.join(app.getPath('userData'), 'bin');
+        const userDataExe = path.join(userDataBin, 'yt-dlp.exe');
+
+        if (app.isPackaged) {
+            const bundledPath = path.join(process.resourcesPath, 'bin', 'yt-dlp.exe');
+            if (fs.existsSync(bundledPath)) {
+                ytDlpPath = bundledPath;
+            } else if (fs.existsSync(userDataExe)) {
+                ytDlpPath = userDataExe;
+            }
+        } else {
+            const devPath = path.join(__dirname, '../../bin/yt-dlp.exe');
+            if (fs.existsSync(devPath)) {
+                ytDlpPath = devPath;
+            } else if (fs.existsSync(userDataExe)) {
+                ytDlpPath = userDataExe;
+            }
+        }
+
+        if (!ytDlpPath) {
+            const { response } = await dialog.showMessageBox(win, {
+                type: 'question',
+                title: 'Componente Necesario',
+                message: 'Para descargar música necesitas el componente "yt-dlp".',
+                detail: 'No se encontró en el sistema. ¿Quieres descargarlo automáticamente ahora? (Aprox 15MB)',
+                buttons: ['Sí, descargar', 'Cancelar'],
+                defaultId: 0,
+                cancelId: 1
+            });
+
+            if (response === 1) {
+                console.log('[Main] User refused yt-dlp download');
+                return;
+            }
+
+            event.sender.send('download-progress', 'Iniciando descarga de componentes...');
+
+            try {
+                if (!fs.existsSync(userDataBin)) {
+                    fs.mkdirSync(userDataBin, { recursive: true });
+                }
+
+                console.log('[Main] Downloading yt-dlp to:', userDataExe);
+                const downloadUrl = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe';
+
+                await new Promise<void>((resolve, reject) => {
+                    const download = (url: string) => {
+                        https.get(url, (res) => {
+                            if (res.statusCode === 302 || res.statusCode === 301) {
+                                download(res.headers.location!);
+                                return;
+                            }
+                            if (res.statusCode !== 200) {
+                                reject(new Error(`Status code: ${res.statusCode}`));
+                                return;
+                            }
+                            const file = fs.createWriteStream(userDataExe);
+                            res.pipe(file);
+                            file.on('finish', () => {
+                                file.close();
+                                resolve();
+                            });
+                            file.on('error', (err) => {
+                                fs.unlink(userDataExe, () => { });
+                                reject(err);
+                            });
+                        }).on('error', reject);
+                    };
+                    download(downloadUrl);
+                });
+
+                ytDlpPath = userDataExe;
+                console.log('[Main] yt-dlp downloaded successfully');
+                event.sender.send('download-progress', 'Componentes instalados. Iniciando descarga de canción...');
+
+            } catch (error: any) {
+                console.error('[Main] Failed to download yt-dlp', error);
+                dialog.showErrorBox('Error', `No se pudo descargar yt-dlp: ${error.message}`);
+                event.sender.send('download-complete', false);
+                return;
+            }
+        }
+
+        console.log('[Main] Using yt-dlp at:', ytDlpPath);
 
         const sanitizedTitle = title.replace(/[<>:"/\\|?*]/g, '_').substring(0, 100);
 
@@ -182,7 +268,7 @@ app.whenReady().then(() => {
         console.log('[Main] Descargando en:', filePath);
         event.sender.send('download-progress', `Descargando: ${title}`);
 
-        const ytdlp = spawn('yt-dlp', [
+        const ytdlp = spawn(ytDlpPath, [
             '-f', 'bestaudio',
             '--extract-audio',
             '--audio-format', 'mp3',
@@ -196,7 +282,6 @@ app.whenReady().then(() => {
         ytdlp.stdout.on('data', (data) => {
             const output = data.toString();
             console.log(`[yt-dlp] ${output}`);
-
 
             if (output.includes('[download]') && output.includes('%')) {
                 const match = output.match(/(\d+\.\d+)%/);
@@ -223,6 +308,7 @@ app.whenReady().then(() => {
 
     autoUpdater.autoDownload = false;
     autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.allowPrerelease = true;
 
     autoUpdater.on('update-available', (info) => {
         console.log('[AutoUpdater] Update available:', info.version);
