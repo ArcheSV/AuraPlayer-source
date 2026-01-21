@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --app-bg: #0b0b0b;
+  --app-text: #f4f4f5;
+  --accent-color: #16a34a;
+  --accent-foreground: #ffffff;
+}
+
+/* Apply variables and transitions globally */
+body {
+  background-color: var(--app-bg);
+  color: var(--app-text);
+  transition: background-color 450ms ease, color 450ms ease;
+}
+
+/* Animations for decorative elements */
+@keyframes float {
+  0% { transform: translateY(0px) translateX(0px) scale(1); }
+  50% { transform: translateY(-8px) translateX(4px) scale(1.02); }
+  100% { transform: translateY(0px) translateX(0px) scale(1); }
+}
+@keyframes float-slow {
+  0% { transform: translateY(0px) translateX(0px) scale(1); }
+  50% { transform: translateY(-18px) translateX(-6px) scale(1.03); }
+  100% { transform: translateY(0px) translateX(0px) scale(1); }
+}
+
+.animate-float { animation: float 6s ease-in-out infinite; }
+.animate-float-slow { animation: float-slow 10s ease-in-out infinite; }
+
+/* Smooth transitions for key properties */
+*, *::before, *::after { transition: background-color 350ms ease, color 350ms ease, border-color 350ms ease, box-shadow 350ms ease, transform 220ms ease; }
+
+/* Theme-wide subtle non-layout animation when switching presets (no scale to avoid scrollbars) */
+@keyframes themePulse { 0% { opacity: 0.98; filter: blur(0.2px); } 50% { opacity: 1; filter: blur(0); } 100% { opacity: 1; filter: blur(0); } }
+.theme-animating { animation: themePulse 700ms ease; }
+
+/* Fade-in for modal and menus */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.animate-fade-in { animation: fadeIn 240ms ease; }
+
+/* Skins: change border radius, spacing, shadows, and accent treatments */
+body[data-skin="rounded"] .rounded-2xl { border-radius: 2rem; }
+body[data-skin="rounded"] .rounded-lg { border-radius: 1.25rem; }
+body[data-skin="compact"] .p-6 { padding: 0.5rem !important; }
+body[data-skin="compact"] .gap-4 { gap: 0.5rem !important; }
+body[data-skin="simple"] { --accent-color: linear-gradient(90deg,#ff7a7a,#ffd47a); }
+body[data-skin="simple"] .shadow-xl { box-shadow: 0 18px 40px rgba(0,0,0,0.65); transform: translateY(-2px); }
+body[data-skin="simple"] .btn-skin { box-shadow: 0 12px 40px var(--accent-color)44; }
+
+/* Make mono visually distinct: muted accents, higher contrast text and simplified UI */
+body[data-skin="mono"] { --accent-color: #9ca3af; --accent-foreground: #0b0b0b; }
+body[data-skin="mono"] .text-zinc-400, body[data-skin="mono"] .text-zinc-300 { color: rgba(255,255,255,0.75) !important; }
+body[data-skin="mono"] .accent-bg { filter: grayscale(100%); opacity: 0.9; box-shadow: none !important; }
+
+/* Modal & utilities */
+.modal-backdrop { background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); }
+
+/* Ensure accent based text uses computed color when present */
+.accent-foreground { color: var(--accent-foreground); }
+
+/* Small helper to style buttons consistently */
+.btn-skin { padding: 0.5rem 0.75rem; border-radius: 0.6rem; background: var(--accent-color); color: var(--accent-foreground); border: 1px solid rgba(255,255,255,0.06); transition: transform 180ms ease, box-shadow 180ms ease; }
+.btn-skin:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 10px 30px var(--accent-color)44; }
+
+.btn-animated { transition: transform 180ms cubic-bezier(.2,.9,.3,1), box-shadow 200ms; }
+.btn-animated:hover { transform: translateY(-3px); }
+
+.accent-bg { background: linear-gradient(135deg, var(--accent-color), var(--accent-color)33); }
+.accent-ring { box-shadow: 0 0 0 4px var(--accent-color)22; }
+
+/* Menu open animations */
+.menu-slide-up { transform-origin: top center; animation: fadeIn 200ms ease; }
+.menu-pop { transform-origin: center; animation: fadeIn 180ms ease; }
+
+/* Menu blur variant: appears with backdrop blur but no slide */
+.menu-blur { backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); opacity: 0; visibility: hidden; }
+
+/* Blur-only appear animation (no translate) */
+@keyframes blurIn { from { opacity: 0; } to { opacity: 1; } }
+/* Only animate when the content has Radix data-state="open" to avoid showing initial placement at (0,0) */
+.menu-blur[data-state="open"] { visibility: visible; opacity: 1; animation: blurIn 180ms cubic-bezier(.2,.9,.3,1); }
+
+/* Important: override global transform transitions for popper wrappers so position changes do NOT animate.
+   We restrict transitions to opacity/backdrop-filter only for these elements. */
+[data-radix-popper-content-wrapper], .menu-blur {
+  transition-property: opacity, backdrop-filter, box-shadow !important;
+  transition-duration: 180ms !important;
+  transition-timing-function: cubic-bezier(.2,.9,.3,1) !important;
+  will-change: opacity, backdrop-filter;
+}
+
+/* Preset swatch styling */
+.preset-swatch { transition: transform 220ms ease, box-shadow 220ms ease; }
+.preset-swatch:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgba(0,0,0,0.5); }
+
+/* Hide vertical scrollbar visually but keep scrolling functional */
+/* Hide scrollbars globally (still allow scrolling) */
+*::-webkit-scrollbar { display: none; width: 0; height: 0; }
+html, body, #root, .app, .main, .container, * { scrollbar-width: none; -ms-overflow-style: none; }
