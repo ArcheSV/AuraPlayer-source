@@ -262,6 +262,7 @@ app.whenReady().then(() => {
 
         if (!filePath) {
             console.log('[Main] User cancelled download');
+            event.sender.send('download-complete', false);
             return;
         }
 
@@ -275,24 +276,26 @@ app.whenReady().then(() => {
             '--audio-quality', '0',
             '--progress',
             '--newline',
+            '--force-overwrites',
             '-o', filePath,
             videoUrl
         ]);
 
         ytdlp.stdout.on('data', (data) => {
             const output = data.toString();
-            console.log(`[yt-dlp] ${output}`);
+            console.log(`[yt-dlp stdout] ${output}`);
 
-            if (output.includes('[download]') && output.includes('%')) {
-                const match = output.match(/(\d+\.\d+)%/);
-                if (match) {
-                    event.sender.send('download-progress', `Descargando: ${match[1]}%`);
-                }
+            const percentMatch = output.match(/(\d{1,3}(?:\.\d+)?)%/);
+            if (percentMatch) {
+                const percent = percentMatch[1];
+                console.log(`[Main] Sending progress: ${percent}%`);
+                event.sender.send('download-progress', `${percent}%`);
             }
         });
 
         ytdlp.stderr.on('data', (data) => {
-            console.error(`[yt-dlp error] ${data}`);
+            const output = data.toString();
+            console.error(`[yt-dlp stderr] ${output}`);
         });
 
         ytdlp.on('close', (code) => {

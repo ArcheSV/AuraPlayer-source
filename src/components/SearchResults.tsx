@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Play, MoreHorizontal, Plus, Download } from 'lucide-react';
 import { usePlayer } from '../context/PlayerContext';
 import { Song } from '../services/youtube';
@@ -16,16 +16,26 @@ export function SearchResults({ songs }: SearchResultsProps) {
     const { loadPlaylist } = usePlayer();
     const { playlists } = usePlaylists();
     const { themeState } = useTheme();
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [downloadProgress, setDownloadProgress] = useState(0);
 
-    
+
     useEffect(() => {
         if (!window.electronAPI) return;
 
         const handleProgress = (_event: any, message: string) => {
-            console.log('[Download Progress]', message);
+            console.log('[SearchResults] Download Progress:', message);
+            const match = message.match(/(\d{1,3}(?:\.\d+)?)%/);
+            if (match) {
+                const percent = parseFloat(match[1]);
+                console.log('[SearchResults] Parsed percent:', percent);
+                setDownloadProgress(percent);
+            }
         };
 
         const handleComplete = (_event: any, success: boolean) => {
+            setIsDownloading(false);
+            setDownloadProgress(0);
             if (success) {
                 toast.success('¡Descarga completada! El archivo se guardó correctamente.', {
                     duration: 4000,
@@ -70,18 +80,21 @@ export function SearchResults({ songs }: SearchResultsProps) {
     };
 
     const handleDownload = (songId: string, songTitle: string) => {
-        
+
         if (window.electronAPI) {
+            if (isDownloading) return;
+            setIsDownloading(true);
+            setDownloadProgress(0);
             toast('Iniciando descarga...', { icon: '🖥️' });
             window.electronAPI.downloadSong(songId, songTitle);
             return;
         }
 
-        
+
         const API_URL = (import.meta.env.VITE_API_URL as string | undefined) || '';
         const downloadUrl = `${API_URL}/api/download?id=${songId}`;
 
-        
+
         window.open(downloadUrl, '_blank');
         toast.success(`Descargando: ${songTitle}`);
     };
@@ -91,86 +104,125 @@ export function SearchResults({ songs }: SearchResultsProps) {
             <div className="text-center text-zinc-400 mt-10">
                 <h2 className="text-2xl font-bold">Empieza a buscar</h2>
                 <p>Encuentra tu música favorita para empezar a escuchar.</p>
+                {isDownloading && (
+                    <div className="mt-6 flex flex-col items-center gap-2">
+                        <p className="text-zinc-200 text-sm font-medium">Descargando...</p>
+                        <div className="w-64 bg-zinc-700 h-2 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-green-500 transition-all duration-300 ease-out"
+                                style={{ width: `${downloadProgress}%` }}
+                            />
+                        </div>
+                        <span className="text-zinc-400 text-xs">{Math.round(downloadProgress)}%</span>
+                    </div>
+                )}
             </div>
         );
     }
 
     return (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {songs.map((song, index) => (
-                <div key={song.id} className="bg-white/5 border border-white/10 p-3 rounded-xl flex flex-col gap-2 hover:bg-white/10 transition-all group relative hover:-translate-y-0.5">
-
-                    <div className="relative w-full aspect-square overflow-hidden rounded-lg bg-zinc-700/40">
-                        <img
-                            src={song.thumbnail}
-                            alt={song.title}
-                            className="absolute top-0 left-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                        />
+        <div>
+            {isDownloading && (
+                <div className="fixed top-20 right-6 z-50 w-72 bg-zinc-900/95 backdrop-blur-md border border-zinc-700 shadow-2xl rounded-xl p-4 flex flex-col gap-3 animate-in fade-in slide-in-from-right-4 duration-300">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-green-500/10 p-2 rounded-full animate-pulse">
+                                <Download size={20} className="text-green-500" />
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-sm font-semibold text-white">Descargando...</span>
+                                <span className="text-xs text-zinc-400">Guardando MP3</span>
+                            </div>
+                        </div>
+                        <span className="text-sm font-bold text-green-400 font-mono">{Math.round(downloadProgress)}%</span>
                     </div>
 
-                    <strong className="font-semibold text-sm truncate mt-2">{song.title}</strong>
-                    <span className="text-xs text-zinc-400 truncate">{song.channel}</span>
-
-                    <button
-                        onClick={() => handlePlayFromSearch(index)}
-                        className="w-12 h-12 flex items-center justify-center pl-1 rounded-full absolute bottom-20 right-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-hover:-translate-y-2 transition-all duration-300 shadow-lg"
-                        style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-foreground)' }}
-                    >
-                        <Play fill="currentColor" />
-                    </button>
-
-                    <div className="absolute top-2 right-2">
-                        <DropdownMenu.Root>
-                            <DropdownMenu.Trigger asChild>
-                                <button className="p-1 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-black/50">
-                                    <MoreHorizontal size={20} />
-                                </button>
-                            </DropdownMenu.Trigger>
-
-                            <DropdownMenu.Portal>
-                                <DropdownMenu.Content
-                                    className="w-56 bg-zinc-900/90 backdrop-blur-md border border-white/10 rounded-md p-1 shadow-xl text-sm z-20 menu-blur menu-blur-anim"
-                                    sideOffset={5} align="end"
-                                >
-                                    <DropdownMenu.Sub>
-                                        <DropdownMenu.SubTrigger className="flex items-center gap-2 px-2 py-1.5 rounded-sm outline-none cursor-pointer hover:bg-white/5">
-                                            <Plus size={16} />
-                                            <span>Añadir a playlist</span>
-                                        </DropdownMenu.SubTrigger>
-                                        <DropdownMenu.Portal>
-                                            <DropdownMenu.SubContent className="w-56 bg-zinc-900/90 backdrop-blur-md border border-white/10 rounded-md p-1 shadow-xl text-sm z-30 menu-blur menu-blur-anim" sideOffset={-4} alignOffset={-5}>
-                                                {playlists.length > 0 ? (
-                                                    playlists.map(playlist => (
-                                                        <DropdownMenu.Item
-                                                            key={playlist.id}
-                                                            onSelect={() => handleAddSong(playlist.id, song)}
-                                                            className="px-2 py-1.5 rounded-sm outline-none cursor-pointer hover:bg-white/5"
-                                                        >
-                                                            {playlist.name}
-                                                        </DropdownMenu.Item>
-                                                    ))
-                                                ) : (
-                                                    <DropdownMenu.Label className="px-2 py-1.5 text-xs text-zinc-400">
-                                                        No tienes playlists. Crea una primero.
-                                                    </DropdownMenu.Label>
-                                                )}
-                                            </DropdownMenu.SubContent>
-                                        </DropdownMenu.Portal>
-                                    </DropdownMenu.Sub>
-
-                                    <DropdownMenu.Item
-                                        onSelect={() => handleDownload(song.id, song.title)}
-                                        className="flex items-center gap-2 px-2 py-1.5 rounded-sm outline-none cursor-pointer hover:bg-white/5"
-                                    >
-                                        <Download size={16} />
-                                        <span>Descargar MP3</span>
-                                    </DropdownMenu.Item>
-                                </DropdownMenu.Content>
-                            </DropdownMenu.Portal>
-                        </DropdownMenu.Root>
+                    <div className="w-full bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-gradient-to-r from-green-500 to-emerald-400 transition-all duration-300 ease-out relative"
+                            style={{ width: `${downloadProgress}%` }}
+                        >
+                            <div className="absolute inset-0 bg-white/20 animate-[shimmer_1s_infinite]" />
+                        </div>
                     </div>
                 </div>
-            ))}
+            )}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {songs.map((song, index) => (
+                    <div key={song.id} className="bg-white/5 border border-white/10 p-3 rounded-xl flex flex-col gap-2 hover:bg-white/10 transition-all group relative hover:-translate-y-0.5">
+
+                        <div className="relative w-full aspect-square overflow-hidden rounded-lg bg-zinc-700/40">
+                            <img
+                                src={song.thumbnail}
+                                alt={song.title}
+                                className="absolute top-0 left-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                            />
+                        </div>
+
+                        <strong className="font-semibold text-sm truncate mt-2">{song.title}</strong>
+                        <span className="text-xs text-zinc-400 truncate">{song.channel}</span>
+
+                        <button
+                            onClick={() => handlePlayFromSearch(index)}
+                            className="w-12 h-12 flex items-center justify-center pl-1 rounded-full absolute bottom-20 right-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-hover:-translate-y-2 transition-all duration-300 shadow-lg"
+                            style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-foreground)' }}
+                        >
+                            <Play fill="currentColor" />
+                        </button>
+
+                        <div className="absolute top-2 right-2">
+                            <DropdownMenu.Root>
+                                <DropdownMenu.Trigger asChild>
+                                    <button className="p-1 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-black/50">
+                                        <MoreHorizontal size={20} />
+                                    </button>
+                                </DropdownMenu.Trigger>
+
+                                <DropdownMenu.Portal>
+                                    <DropdownMenu.Content
+                                        className="w-56 bg-zinc-900/90 backdrop-blur-md border border-white/10 rounded-md p-1 shadow-xl text-sm z-20 menu-blur menu-blur-anim"
+                                        sideOffset={5} align="end"
+                                    >
+                                        <DropdownMenu.Sub>
+                                            <DropdownMenu.SubTrigger className="flex items-center gap-2 px-2 py-1.5 rounded-sm outline-none cursor-pointer hover:bg-white/5">
+                                                <Plus size={16} />
+                                                <span>Añadir a playlist</span>
+                                            </DropdownMenu.SubTrigger>
+                                            <DropdownMenu.Portal>
+                                                <DropdownMenu.SubContent className="w-56 bg-zinc-900/90 backdrop-blur-md border border-white/10 rounded-md p-1 shadow-xl text-sm z-30 menu-blur menu-blur-anim" sideOffset={-4} alignOffset={-5}>
+                                                    {playlists.length > 0 ? (
+                                                        playlists.map(playlist => (
+                                                            <DropdownMenu.Item
+                                                                key={playlist.id}
+                                                                onSelect={() => handleAddSong(playlist.id, song)}
+                                                                className="px-2 py-1.5 rounded-sm outline-none cursor-pointer hover:bg-white/5"
+                                                            >
+                                                                {playlist.name}
+                                                            </DropdownMenu.Item>
+                                                        ))
+                                                    ) : (
+                                                        <DropdownMenu.Label className="px-2 py-1.5 text-xs text-zinc-400">
+                                                            No tienes playlists. Crea una primero.
+                                                        </DropdownMenu.Label>
+                                                    )}
+                                                </DropdownMenu.SubContent>
+                                            </DropdownMenu.Portal>
+                                        </DropdownMenu.Sub>
+
+                                        <DropdownMenu.Item
+                                            onSelect={() => handleDownload(song.id, song.title)}
+                                            className="flex items-center gap-2 px-2 py-1.5 rounded-sm outline-none cursor-pointer hover:bg-white/5"
+                                        >
+                                            <Download size={16} />
+                                            <span>Descargar MP3</span>
+                                        </DropdownMenu.Item>
+                                    </DropdownMenu.Content>
+                                </DropdownMenu.Portal>
+                            </DropdownMenu.Root>
+                        </div>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }

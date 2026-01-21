@@ -148,6 +148,20 @@ export function PlayerControls() {
   };
 
   if (!currentSong) {
+    if (isDownloading) {
+      return (
+        <footer className="fixed bottom-0 left-0 right-0 h-[92px] bg-zinc-900 border-t border-zinc-700 flex flex-col items-center justify-center gap-2">
+          <p className="text-zinc-200 text-sm font-medium">Descargando...</p>
+          <div className="w-64 bg-zinc-700 h-2 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-green-500 transition-all duration-300 ease-out"
+              style={{ width: `${downloadProgress}%` }}
+            />
+          </div>
+          <span className="text-zinc-400 text-xs">{Math.round(downloadProgress)}%</span>
+        </footer>
+      );
+    }
     return <footer className="fixed bottom-0 left-0 right-0 h-[92px] bg-zinc-900 border-t border-zinc-700 flex items-center justify-center"><p className="text-zinc-500">Selecciona una canción para reproducir</p></footer>;
   }
 
